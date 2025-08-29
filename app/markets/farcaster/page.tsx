@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAccount, useWalletClient } from "wagmi";
 import { MobileShell } from "~/components/ui/MobileShell";
 import { TopBar } from "~/components/ui/TopBar";
@@ -10,7 +10,7 @@ import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import { BetModal } from "~/components/ui/BetModal";
 import { ListSkeleton } from "~/components/ui/ListSkeleton";
 import { EmptyState } from "~/components/ui/EmptyState";
-import { blinkContract, formatTimeRemaining } from "~/lib/contracts";
+import { blinkContract, formatTimeRemaining, publicClient } from "~/lib/contracts";
 import { CreateMarketModal } from "~/components/ui/CreateMarketModal";
 
 type MarketItem = {
@@ -38,46 +38,49 @@ export default function FarcasterMarketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ id: string; title: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [txStatus, setTxStatus] = useState<{ stage: "idle" | "submitting" | "submitted" | "confirmed" | "error"; hash?: `0x${string}`; error?: string; }>({ stage: "idle" });
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
 
-  useEffect(() => {
-    let active = true;
+  const fetchMarkets = useCallback(async () => {
     setLoading(true);
     setError(null);
-
-    const fetchMarkets = async () => {
-      try {
-        // Filter to Channel Growth type
-        const response = await fetch(`/api/markets?type=CHANNEL_GROWTH`);
-        const result = await response.json();
-        if (active) {
-          let markets: MarketItem[] = result?.data || [];
-          if (debouncedSearch) {
-            const q = debouncedSearch.toLowerCase();
-            markets = markets.filter((m) => m.title.toLowerCase().includes(q));
-          }
-          setData(markets);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (active) {
-          setError("Failed to fetch markets");
-          setData([]);
-          setLoading(false);
-        }
+    try {
+      const response = await fetch(`/api/markets?type=CHANNEL_GROWTH`);
+      const result = await response.json();
+      let markets: MarketItem[] = result?.data || [];
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        markets = markets.filter((m) => m.title.toLowerCase().includes(q));
       }
-    };
-
-    fetchMarkets();
-    return () => {
-      active = false;
-    };
+      setData(markets);
+    } catch (err) {
+      setError("Failed to fetch markets");
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    fetchMarkets();
+  }, [fetchMarkets]);
 
   return (
     <MobileShell activeTab="markets" topBar={<TopBar title="Farcaster Markets" backHref="/markets" />}>
       <div className="p-4 pb-24">
+        {txStatus.stage !== "idle" && (
+          <div className="mb-3 text-sm rounded-md px-3 py-2 border"
+               style={{ borderColor: "var(--border)" }}>
+            {txStatus.stage === "submitting" && "Submitting transaction..."}
+            {txStatus.stage === "submitted" && (
+              <span>Transaction submitted: <span className="font-mono">{txStatus.hash}</span></span>
+            )}
+            {txStatus.stage === "confirmed" && "Transaction confirmed. Updating markets..."}
+            {txStatus.stage === "error" && <span className="text-danger">{txStatus.error}</span>}
+          </div>
+        )}
+
         <div className="mb-1">
           <div className="font-bold text-xl">Channel Growth Bets</div>
           <div className="text-textSecondary text-base">
@@ -138,15 +141,24 @@ export default function FarcasterMarketsPage() {
             onSubmit={async ({ amount, side }) => {
               if (!address) throw new Error("Connect a wallet or Base Account");
               const marketId = parseInt(modal.id, 10);
-              const hash = await blinkContract.placeBet({
-                walletClient,
-                userAddress: address,
-                marketId,
-                outcome: side === "yes",
-                usdcAmount: amount,
-              });
-              window.dispatchEvent(new CustomEvent("new-bet", { detail: { txHash: hash } }));
-              setModal(null);
+              setTxStatus({ stage: "submitting" });
+              try {
+                const hash = await blinkContract.placeBet({
+                  walletClient,
+                  userAddress: address,
+                  marketId,
+                  outcome: side === "yes",
+                  usdcAmount: amount,
+                });
+                setTxStatus({ stage: "submitted", hash });
+                setModal(null);
+                await publicClient.waitForTransactionReceipt({ hash });
+                setTxStatus({ stage: "confirmed", hash });
+                await fetchMarkets();
+                setTimeout(() => setTxStatus({ stage: "idle" }), 2500);
+              } catch (e: any) {
+                setTxStatus({ stage: "error", error: e?.message || "Transaction failed" });
+              }
             }}
           />
         )}
@@ -154,9 +166,17 @@ export default function FarcasterMarketsPage() {
           <CreateMarketModal
             open={showCreate}
             onClose={() => setShowCreate(false)}
-            onCreated={() => {
+            onCreated={async (hash) => {
+              setTxStatus({ stage: "submitted", hash });
               setShowCreate(false);
-              setTimeout(() => location.reload(), 300);
+              try {
+                await publicClient.waitForTransactionReceipt({ hash });
+                setTxStatus({ stage: "confirmed", hash });
+                await fetchMarkets();
+                setTimeout(() => setTxStatus({ stage: "idle" }), 2500);
+              } catch (e: any) {
+                setTxStatus({ stage: "error", error: e?.message || "Transaction failed" });
+              }
             }}
           />
         )}
