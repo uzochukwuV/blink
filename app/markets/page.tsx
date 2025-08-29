@@ -1,18 +1,18 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAccount, useWalletClient } from "wagmi";
 import { MobileShell } from "~/components/ui/MobileShell";
 import { TopBar } from "~/components/ui/TopBar";
 import { PillButton } from "~/components/ui/PillButton";
 import { SearchBar } from "~/components/ui/SearchBar";
 import { SegmentedControl } from "~/components/ui/SegmentedControl";
-import { ListItem } from "~/components/ui/ListItem";
 import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import { BetModal } from "~/components/ui/BetModal";
 import { ListSkeleton } from "~/components/ui/ListSkeleton";
 import { EmptyState } from "~/components/ui/EmptyState";
-// removed mock imports
 import { Creator } from "~/lib/types";
+import { blinkContract } from "~/lib/contracts";
 
 export default function MarketsPage() {
   const [segment, setSegment] = useState(0);
@@ -22,29 +22,31 @@ export default function MarketsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ id: string; title: string } | null>(null);
+  const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
-    
+
     const fetchCreators = async () => {
       try {
         const params = new URLSearchParams();
         if (debouncedSearch) {
-          params.append('search', debouncedSearch);
+          params.append("search", debouncedSearch);
         }
-        
+
         const response = await fetch(`/api/markets/creators?${params}`);
         const result = await response.json();
-        
+
         if (active) {
           setData(result.data || []);
           setLoading(false);
         }
       } catch (err) {
         if (active) {
-          setError('Failed to fetch creators');
+          setError("Failed to fetch creators");
           setData([]);
           setLoading(false);
         }
@@ -52,7 +54,9 @@ export default function MarketsPage() {
     };
 
     fetchCreators();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [debouncedSearch]);
 
   return (
@@ -73,7 +77,7 @@ export default function MarketsPage() {
         <SearchBar
           placeholder="Search creators"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
         />
         <SegmentedControl
           options={["Trending", "Popular", "New"]}
@@ -93,8 +97,8 @@ export default function MarketsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {c.pfpUrl ? (
-                      <img 
-                        src={c.pfpUrl} 
+                      <img
+                        src={c.pfpUrl}
                         alt={c.name}
                         className="w-12 h-12 rounded-full object-cover"
                       />
@@ -109,14 +113,15 @@ export default function MarketsPage() {
                         {c.verified && <span className="text-primary text-sm">✓</span>}
                       </div>
                       <div className="text-textSecondary text-sm">
-                        {c.username && `@${c.username} • `}{c.followers.toLocaleString()} followers
+                        {c.username && `@${c.username} • `}
+                        {c.followers.toLocaleString()} followers
                       </div>
                       {c.bio && (
                         <div className="text-textSecondary text-xs mt-1 line-clamp-2">{c.bio}</div>
                       )}
                     </div>
                   </div>
-                  <PillButton 
+                  <PillButton
                     className="bg-primary hover:bg-primary-dark text-white px-6"
                     onClick={() => setModal({ id: c.id, title: c.name })}
                   >
@@ -132,18 +137,20 @@ export default function MarketsPage() {
             open={!!modal}
             onClose={() => setModal(null)}
             market={modal}
-            onSubmit={async (payload) => {
-              const resp = await fetch("/api/bets", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  marketId: modal.id,
-                  marketTitle: modal.title,
-                  ...payload,
-                }),
+            onSubmit={async ({ amount, side }) => {
+              if (!address) throw new Error("Connect a wallet or Base Account");
+              const marketId = parseInt(modal.id, 10);
+              if (!Number.isFinite(marketId)) {
+                throw new Error("Invalid market id");
+              }
+              const hash = await blinkContract.placeBet({
+                walletClient,
+                userAddress: address,
+                marketId,
+                outcome: side === "yes",
+                usdcAmount: amount,
               });
-              const bet = await resp.json();
-              window.dispatchEvent(new CustomEvent("new-bet", { detail: bet }));
+              window.dispatchEvent(new CustomEvent("new-bet", { detail: { txHash: hash } }));
               setModal(null);
             }}
           />
