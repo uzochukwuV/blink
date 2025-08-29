@@ -1,82 +1,131 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useAccount, useWalletClient } from "wagmi";
 import { MobileShell } from "~/components/ui/MobileShell";
 import { TopBar } from "~/components/ui/TopBar";
 import { PillButton } from "~/components/ui/PillButton";
 import { SearchBar } from "~/components/ui/SearchBar";
 import { SegmentedControl } from "~/components/ui/SegmentedControl";
-import { ListItem } from "~/components/ui/ListItem";
 import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import { BetModal } from "~/components/ui/BetModal";
 import { ListSkeleton } from "~/components/ui/ListSkeleton";
 import { EmptyState } from "~/components/ui/EmptyState";
-// removed mock imports
-import { Creator } from "~/lib/types";
+import { blinkContract, formatTimeRemaining, publicClient } from "~/lib/contracts";
+import { CreateMarketModal } from "~/components/ui/CreateMarketModal";
+
+type MarketItem = {
+  id: number;
+  type: number;
+  title: string;
+  targetId: string;
+  threshold: number;
+  deadline: number;
+  status: number;
+  yesPool: number;
+  noPool: number;
+  totalVolume: number;
+  creatorStake: number;
+  creator: string;
+  odds: { yes: number; no: number };
+  currentMetrics?: any;
+};
+
+function segmentToTypeString(segment: number): string | undefined {
+  switch (segment) {
+    case 1:
+      return "VIRAL_CAST";
+    case 2:
+      return "POLL_OUTCOME";
+    case 3:
+      return "CHANNEL_GROWTH";
+    case 4:
+      return "CREATOR_MILESTONE";
+    default:
+      return undefined;
+  }
+}
 
 export default function MarketsPage() {
   const [segment, setSegment] = useState(0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [data, setData] = useState<Creator[]>([]);
+  const [data, setData] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ id: string; title: string } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [txStatus, setTxStatus] = useState<{ stage: "idle" | "submitting" | "submitted" | "confirmed" | "error"; hash?: `0x${string}`; error?: string; }>({ stage: "idle" });
+  const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
-  useEffect(() => {
-    let active = true;
+  const typeFilter = useMemo(() => segmentToTypeString(segment), [segment]);
+
+  const fetchMarkets = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
-    const fetchCreators = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (debouncedSearch) {
-          params.append('search', debouncedSearch);
-        }
-        
-        const response = await fetch(`/api/markets/creators?${params}`);
-        const result = await response.json();
-        
-        if (active) {
-          setData(result.data || []);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (active) {
-          setError('Failed to fetch creators');
-          setData([]);
-          setLoading(false);
-        }
+    try {
+      const params = new URLSearchParams();
+      if (typeFilter) params.set("type", typeFilter);
+      const response = await fetch(`/api/markets?${params.toString()}`);
+      const result = await response.json();
+      let markets: MarketItem[] = result?.data || [];
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        markets = markets.filter((m) => m.title.toLowerCase().includes(q));
       }
-    };
+      setData(markets);
+    } catch (err) {
+      setError("Failed to fetch markets");
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, typeFilter]);
 
-    fetchCreators();
-    return () => { active = false; };
-  }, [debouncedSearch]);
+  useEffect(() => {
+    fetchMarkets();
+  }, [fetchMarkets]);
 
   return (
     <MobileShell
       activeTab="markets"
       topBar={
         <TopBar
-          title="Creator Bets"
+          title="Markets"
           actionSlot={
-            <Link href="/markets/farcaster">
-              <PillButton className="px-3 py-1 text-sm">Farcaster</PillButton>
-            </Link>
+            <div className="flex gap-2">
+              <PillButton className="px-3 py-1 text-sm" onClick={() => setShowCreate(true)}>
+                Create
+              </PillButton>
+              <Link href="/markets/farcaster">
+                <PillButton className="px-3 py-1 text-sm">Farcaster</PillButton>
+              </Link>
+            </div>
           }
         />
       }
     >
       <div className="p-4 pb-24">
+        {txStatus.stage !== "idle" && (
+          <div className="mb-3 text-sm rounded-md px-3 py-2 border"
+               style={{ borderColor: "var(--border)" }}>
+            {txStatus.stage === "submitting" && "Submitting transaction..."}
+            {txStatus.stage === "submitted" && (
+              <span>Transaction submitted: <span className="font-mono">{txStatus.hash}</span></span>
+            )}
+            {txStatus.stage === "confirmed" && "Transaction confirmed. Updating markets..."}
+            {txStatus.stage === "error" && <span className="text-danger">{txStatus.error}</span>}
+          </div>
+        )}
+
         <SearchBar
-          placeholder="Search creators"
+          placeholder="Search markets"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
         />
         <SegmentedControl
-          options={["Trending", "Popular", "New"]}
+          options={["All", "Viral Cast", "Poll", "Channel", "Creator"]}
           value={segment}
           onChange={setSegment}
         />
@@ -85,40 +134,24 @@ export default function MarketsPage() {
         ) : error ? (
           <div className="bg-danger/10 text-danger rounded p-2 mb-2">{error}</div>
         ) : data.length === 0 ? (
-          <EmptyState label="No creators found." />
+          <EmptyState label="No markets found." />
         ) : (
           <div className="mt-4 flex flex-col gap-3">
-            {data.map((c) => (
-              <div key={c.id} className="bg-card rounded-lg p-4 border border-borderSubtle">
+            {data.map((m) => (
+              <div key={m.id} className="bg-card rounded-lg p-4 border border-borderSubtle">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {c.pfpUrl ? (
-                      <img 
-                        src={c.pfpUrl} 
-                        alt={c.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-light flex items-center justify-center text-white font-semibold">
-                        {c.avatarInitials}
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-semibold text-textPrimary flex items-center gap-2">
-                        {c.name}
-                        {c.verified && <span className="text-primary text-sm">✓</span>}
-                      </div>
-                      <div className="text-textSecondary text-sm">
-                        {c.username && `@${c.username} • `}{c.followers.toLocaleString()} followers
-                      </div>
-                      {c.bio && (
-                        <div className="text-textSecondary text-xs mt-1 line-clamp-2">{c.bio}</div>
-                      )}
+                  <div>
+                    <div className="font-semibold text-textPrimary">{m.title}</div>
+                    <div className="text-xs text-textSecondary">
+                      Yes: {m.odds.yes.toFixed(2)}x • No: {m.odds.no.toFixed(2)}x • Ends in {formatTimeRemaining(m.deadline)}
+                    </div>
+                    <div className="text-xs text-textSecondary mt-1">
+                      Pools • Yes: {m.yesPool.toFixed(2)} USDC • No: {m.noPool.toFixed(2)} USDC • Vol: {m.totalVolume.toFixed(2)} USDC
                     </div>
                   </div>
-                  <PillButton 
-                    className="bg-primary hover:bg-primary-dark text-white px-6"
-                    onClick={() => setModal({ id: c.id, title: c.name })}
+                  <PillButton
+                    className="bg-primary hover:bg-primary-dark text-white px-5"
+                    onClick={() => setModal({ id: String(m.id), title: m.title })}
                   >
                     Bet
                   </PillButton>
@@ -132,19 +165,45 @@ export default function MarketsPage() {
             open={!!modal}
             onClose={() => setModal(null)}
             market={modal}
-            onSubmit={async (payload) => {
-              const resp = await fetch("/api/bets", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  marketId: modal.id,
-                  marketTitle: modal.title,
-                  ...payload,
-                }),
-              });
-              const bet = await resp.json();
-              window.dispatchEvent(new CustomEvent("new-bet", { detail: bet }));
-              setModal(null);
+            onSubmit={async ({ amount, side }) => {
+              if (!address) throw new Error("Connect a wallet or Base Account");
+              const marketId = parseInt(modal.id, 10);
+              setTxStatus({ stage: "submitting" });
+              try {
+                const hash = await blinkContract.placeBet({
+                  walletClient,
+                  userAddress: address,
+                  marketId,
+                  outcome: side === "yes",
+                  usdcAmount: amount,
+                });
+                setTxStatus({ stage: "submitted", hash });
+                setModal(null);
+                await publicClient.waitForTransactionReceipt({ hash });
+                setTxStatus({ stage: "confirmed", hash });
+                await fetchMarkets();
+                setTimeout(() => setTxStatus({ stage: "idle" }), 2500);
+              } catch (e: any) {
+                setTxStatus({ stage: "error", error: e?.message || "Transaction failed" });
+              }
+            }}
+          />
+        )}
+        {showCreate && (
+          <CreateMarketModal
+            open={showCreate}
+            onClose={() => setShowCreate(false)}
+            onCreated={async (hash) => {
+              setTxStatus({ stage: "submitted", hash });
+              setShowCreate(false);
+              try {
+                await publicClient.waitForTransactionReceipt({ hash });
+                setTxStatus({ stage: "confirmed", hash });
+                await fetchMarkets();
+                setTimeout(() => setTxStatus({ stage: "idle" }), 2500);
+              } catch (e: any) {
+                setTxStatus({ stage: "error", error: e?.message || "Transaction failed" });
+              }
             }}
           />
         )}
