@@ -5,23 +5,39 @@ import { MobileShell } from "~/components/ui/MobileShell";
 import { TopBar } from "~/components/ui/TopBar";
 import { SegmentedControl } from "~/components/ui/SegmentedControl";
 import { PillButton } from "~/components/ui/PillButton";
-import { TimeTiles } from "~/components/ui/TimeTiles";
 import { SearchBar } from "~/components/ui/SearchBar";
 import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import { BetModal } from "~/components/ui/BetModal";
 import { ListSkeleton } from "~/components/ui/ListSkeleton";
 import { EmptyState } from "~/components/ui/EmptyState";
-import { Channel } from "~/lib/types";
-import { blinkContract } from "~/lib/contracts";
+import { blinkContract, formatTimeRemaining } from "~/lib/contracts";
+import { CreateMarketModal } from "~/components/ui/CreateMarketModal";
+
+type MarketItem = {
+  id: number;
+  type: number;
+  title: string;
+  targetId: string;
+  threshold: number;
+  deadline: number;
+  status: number;
+  yesPool: number;
+  noPool: number;
+  totalVolume: number;
+  creatorStake: number;
+  creator: string;
+  odds: { yes: number; no: number };
+};
 
 export default function FarcasterMarketsPage() {
   const [segment, setSegment] = useState(0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [data, setData] = useState<Channel[]>([]);
+  const [data, setData] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ id: string; title: string } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
 
@@ -30,37 +46,37 @@ export default function FarcasterMarketsPage() {
     setLoading(true);
     setError(null);
 
-    const fetchChannels = async () => {
+    const fetchMarkets = async () => {
       try {
-        const params = new URLSearchParams();
-        if (debouncedSearch) {
-          params.append("search", debouncedSearch);
-        }
-
-        const response = await fetch(`/api/markets/channels?${params}`);
+        // Filter to Channel Growth type
+        const response = await fetch(`/api/markets?type=CHANNEL_GROWTH`);
         const result = await response.json();
-
         if (active) {
-          setData(result.data || []);
+          let markets: MarketItem[] = result?.data || [];
+          if (debouncedSearch) {
+            const q = debouncedSearch.toLowerCase();
+            markets = markets.filter((m) => m.title.toLowerCase().includes(q));
+          }
+          setData(markets);
           setLoading(false);
         }
       } catch (err) {
         if (active) {
-          setError("Failed to fetch channels");
+          setError("Failed to fetch markets");
           setData([]);
           setLoading(false);
         }
       }
     };
 
-    fetchChannels();
+    fetchMarkets();
     return () => {
       active = false;
     };
   }, [debouncedSearch]);
 
   return (
-    <MobileShell activeTab="markets" topBar={<TopBar title="Farcaster Bets" backHref="/markets" />}>
+    <MobileShell activeTab="markets" topBar={<TopBar title="Farcaster Markets" backHref="/markets" />}>
       <div className="p-4 pb-24">
         <div className="mb-1">
           <div className="font-bold text-xl">Channel Growth Bets</div>
@@ -69,7 +85,7 @@ export default function FarcasterMarketsPage() {
           </div>
         </div>
         <SearchBar
-          placeholder="Search channels"
+          placeholder="Search markets"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -83,56 +99,37 @@ export default function FarcasterMarketsPage() {
         ) : error ? (
           <div className="bg-danger/10 text-danger rounded p-2 mb-2">{error}</div>
         ) : data.length === 0 ? (
-          <EmptyState label="No channels found." />
+          <EmptyState label="No markets found." />
         ) : (
           <div className="mt-4 flex flex-col gap-3">
-            {data.map((c) => (
-              <div key={c.id} className="bg-card rounded-lg p-4 border border-borderSubtle">
+            {data.map((m) => (
+              <div key={m.id} className="bg-card rounded-lg p-4 border border-borderSubtle">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {c.imageUrl ? (
-                      <img src={c.imageUrl} alt={c.name} className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-light flex items-center justify-center text-white font-semibold text-xs">
-                        {c.avatarInitials}
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-semibold text-textPrimary">{c.name}</div>
-                      <div className="text-textSecondary text-sm">
-                        {c.followers.toLocaleString()} followers
-                      </div>
-                      {c.description && (
-                        <div className="text-textSecondary text-xs mt-1 line-clamp-1">{c.description}</div>
-                      )}
+                  <div>
+                    <div className="font-semibold text-textPrimary">{m.title}</div>
+                    <div className="text-xs text-textSecondary">
+                      Yes: {m.odds.yes.toFixed(2)}x • No: {m.odds.no.toFixed(2)}x • Ends in {formatTimeRemaining(m.deadline)}
+                    </div>
+                    <div className="text-xs text-textSecondary mt-1">
+                      Pools • Yes: {m.yesPool.toFixed(2)} USDC • No: {m.noPool.toFixed(2)} USDC • Vol: {m.totalVolume.toFixed(2)} USDC
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-success font-semibold">+{c.growth}%</div>
-                    <PillButton
-                      className="bg-primary hover:bg-primary-dark text-white px-4 py-1 text-xs mt-1"
-                      onClick={() => setModal({ id: c.id, title: c.name })}
-                    >
-                      Bet
-                    </PillButton>
-                  </div>
+                  <PillButton
+                    className="bg-primary hover:bg-primary-dark text-white px-4 py-1 text-xs mt-1"
+                    onClick={() => setModal({ id: String(m.id), title: m.title })}
+                  >
+                    Bet
+                  </PillButton>
                 </div>
               </div>
             ))}
           </div>
         )}
         <div className="mt-6 mb-6">
-          <div className="text-textPrimary font-semibold mb-3">Time Remaining</div>
-          <TimeTiles
-            tiles={[
-              { label: "Days", value: "2" },
-              { label: "Hours", value: "12" },
-              { label: "Minutes", value: "30" },
-              { label: "Seconds", value: "45" },
-            ]}
-          />
+          <PillButton className="w-full bg-primary hover:bg-primary-dark text-white" onClick={() => setShowCreate(true)}>
+            Create Market
+          </PillButton>
         </div>
-        <PillButton className="w-full bg-primary hover:bg-primary-dark text-white">Place Bet</PillButton>
         {modal && (
           <BetModal
             open={!!modal}
@@ -141,9 +138,6 @@ export default function FarcasterMarketsPage() {
             onSubmit={async ({ amount, side }) => {
               if (!address) throw new Error("Connect a wallet or Base Account");
               const marketId = parseInt(modal.id, 10);
-              if (!Number.isFinite(marketId)) {
-                throw new Error("Invalid market id");
-              }
               const hash = await blinkContract.placeBet({
                 walletClient,
                 userAddress: address,
@@ -153,6 +147,16 @@ export default function FarcasterMarketsPage() {
               });
               window.dispatchEvent(new CustomEvent("new-bet", { detail: { txHash: hash } }));
               setModal(null);
+            }}
+          />
+        )}
+        {showCreate && (
+          <CreateMarketModal
+            open={showCreate}
+            onClose={() => setShowCreate(false)}
+            onCreated={() => {
+              setShowCreate(false);
+              setTimeout(() => location.reload(), 300);
             }}
           />
         )}

@@ -414,6 +414,81 @@ export const blinkContract = {
 
     return hash as string;
   },
+
+  async createMarket({
+    walletClient,
+    userAddress,
+    type,
+    title,
+    targetId,
+    threshold,
+    durationHours,
+    creatorStakeUSDC,
+  }: {
+    walletClient?: any;
+    userAddress: `0x${string}`;
+    type: PredictionType;
+    title: string;
+    targetId: string;
+    threshold: number;
+    durationHours: number;
+    creatorStakeUSDC: number;
+  }) {
+    const stake6 = parseUnits(creatorStakeUSDC.toString(), 6);
+
+    // Check allowance
+    const allowance = await publicClient.readContract({
+      address: USDC_CONTRACT_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [userAddress, BLINK_CONTRACT_ADDRESS],
+    }) as bigint;
+
+    const calls: Array<{ to: `0x${string}`; data: `0x${string}`; value?: bigint }> = [];
+    if (allowance < stake6) {
+      const approveData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [BLINK_CONTRACT_ADDRESS, stake6],
+      });
+      calls.push({ to: USDC_CONTRACT_ADDRESS, data: approveData });
+    }
+
+    const createData = encodeFunctionData({
+      abi: BLINK_ABI,
+      functionName: 'createMarket',
+      args: [type, title, targetId, BigInt(threshold), BigInt(durationHours), stake6],
+    });
+    calls.push({ to: BLINK_CONTRACT_ADDRESS, data: createData });
+
+    if (isBaseAccountAvailable()) {
+      return await sendBaseAccountTransaction(calls);
+    }
+
+    if (!walletClient) {
+      throw new Error('No Base Account provider or wallet client available');
+    }
+
+    if (allowance < stake6) {
+      await walletClient.writeContract({
+        address: USDC_CONTRACT_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [BLINK_CONTRACT_ADDRESS, stake6],
+        account: userAddress,
+      });
+    }
+
+    const hash = await walletClient.writeContract({
+      address: BLINK_CONTRACT_ADDRESS,
+      abi: BLINK_ABI,
+      functionName: 'createMarket',
+      args: [type, title, targetId, BigInt(threshold), BigInt(durationHours), stake6],
+      account: userAddress,
+    });
+
+    return hash as string;
+  },
 };
 
 // Utilities

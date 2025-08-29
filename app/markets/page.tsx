@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAccount, useWalletClient } from "wagmi";
 import { MobileShell } from "~/components/ui/MobileShell";
@@ -11,76 +11,105 @@ import { useDebouncedValue } from "~/hooks/useDebouncedValue";
 import { BetModal } from "~/components/ui/BetModal";
 import { ListSkeleton } from "~/components/ui/ListSkeleton";
 import { EmptyState } from "~/components/ui/EmptyState";
-import { Creator } from "~/lib/types";
-import { blinkContract } from "~/lib/contracts";
+import { blinkContract, formatTimeRemaining } from "~/lib/contracts";
+import { CreateMarketModal } from "~/components/ui/CreateMarketModal";
+
+type MarketItem = {
+  id: number;
+  type: number;
+  title: string;
+  targetId: string;
+  threshold: number;
+  deadline: number;
+  status: number;
+  yesPool: number;
+  noPool: number;
+  totalVolume: number;
+  creatorStake: number;
+  creator: string;
+  odds: { yes: number; no: number };
+  currentMetrics?: any;
+};
 
 export default function MarketsPage() {
   const [segment, setSegment] = useState(0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [data, setData] = useState<Creator[]>([]);
+  const [data, setData] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ id: string; title: string } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
+
+  const typeFilter = useMemo(() => {
+    // map segments to types if desired; keep all types for now
+    return undefined as number | undefined;
+  }, [segment]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
 
-    const fetchCreators = async () => {
+    const fetchMarkets = async () => {
       try {
         const params = new URLSearchParams();
-        if (debouncedSearch) {
-          params.append("search", debouncedSearch);
-        }
-
-        const response = await fetch(`/api/markets/creators?${params}`);
+        if (typeFilter !== undefined) params.set("type", String(typeFilter));
+        const response = await fetch(`/api/markets?${params.toString()}`);
         const result = await response.json();
-
         if (active) {
-          setData(result.data || []);
+          let markets: MarketItem[] = result?.data || [];
+          if (debouncedSearch) {
+            const q = debouncedSearch.toLowerCase();
+            markets = markets.filter((m) => m.title.toLowerCase().includes(q));
+          }
+          setData(markets);
           setLoading(false);
         }
       } catch (err) {
         if (active) {
-          setError("Failed to fetch creators");
+          setError("Failed to fetch markets");
           setData([]);
           setLoading(false);
         }
       }
     };
 
-    fetchCreators();
+    fetchMarkets();
     return () => {
       active = false;
     };
-  }, [debouncedSearch]);
+  }, [debouncedSearch, typeFilter]);
 
   return (
     <MobileShell
       activeTab="markets"
       topBar={
         <TopBar
-          title="Creator Bets"
+          title="Markets"
           actionSlot={
-            <Link href="/markets/farcaster">
-              <PillButton className="px-3 py-1 text-sm">Farcaster</PillButton>
-            </Link>
+            <div className="flex gap-2">
+              <PillButton className="px-3 py-1 text-sm" onClick={() => setShowCreate(true)}>
+                Create
+              </PillButton>
+              <Link href="/markets/farcaster">
+                <PillButton className="px-3 py-1 text-sm">Farcaster</PillButton>
+              </Link>
+            </div>
           }
         />
       }
     >
       <div className="p-4 pb-24">
         <SearchBar
-          placeholder="Search creators"
+          placeholder="Search markets"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <SegmentedControl
-          options={["Trending", "Popular", "New"]}
+          options={["All", "Viral Cast", "Poll", "Channel", "Creator"]}
           value={segment}
           onChange={setSegment}
         />
@@ -89,41 +118,24 @@ export default function MarketsPage() {
         ) : error ? (
           <div className="bg-danger/10 text-danger rounded p-2 mb-2">{error}</div>
         ) : data.length === 0 ? (
-          <EmptyState label="No creators found." />
+          <EmptyState label="No markets found." />
         ) : (
           <div className="mt-4 flex flex-col gap-3">
-            {data.map((c) => (
-              <div key={c.id} className="bg-card rounded-lg p-4 border border-borderSubtle">
+            {data.map((m) => (
+              <div key={m.id} className="bg-card rounded-lg p-4 border border-borderSubtle">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {c.pfpUrl ? (
-                      <img
-                        src={c.pfpUrl}
-                        alt={c.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-light flex items-center justify-center text-white font-semibold">
-                        {c.avatarInitials}
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-semibold text-textPrimary flex items-center gap-2">
-                        {c.name}
-                        {c.verified && <span className="text-primary text-sm">✓</span>}
-                      </div>
-                      <div className="text-textSecondary text-sm">
-                        {c.username && `@${c.username} • `}
-                        {c.followers.toLocaleString()} followers
-                      </div>
-                      {c.bio && (
-                        <div className="text-textSecondary text-xs mt-1 line-clamp-2">{c.bio}</div>
-                      )}
+                  <div>
+                    <div className="font-semibold text-textPrimary">{m.title}</div>
+                    <div className="text-xs text-textSecondary">
+                      Yes: {m.odds.yes.toFixed(2)}x • No: {m.odds.no.toFixed(2)}x • Ends in {formatTimeRemaining(m.deadline)}
+                    </div>
+                    <div className="text-xs text-textSecondary mt-1">
+                      Pools • Yes: {m.yesPool.toFixed(2)} USDC • No: {m.noPool.toFixed(2)} USDC • Vol: {m.totalVolume.toFixed(2)} USDC
                     </div>
                   </div>
                   <PillButton
-                    className="bg-primary hover:bg-primary-dark text-white px-6"
-                    onClick={() => setModal({ id: c.id, title: c.name })}
+                    className="bg-primary hover:bg-primary-dark text-white px-5"
+                    onClick={() => setModal({ id: String(m.id), title: m.title })}
                   >
                     Bet
                   </PillButton>
@@ -140,9 +152,6 @@ export default function MarketsPage() {
             onSubmit={async ({ amount, side }) => {
               if (!address) throw new Error("Connect a wallet or Base Account");
               const marketId = parseInt(modal.id, 10);
-              if (!Number.isFinite(marketId)) {
-                throw new Error("Invalid market id");
-              }
               const hash = await blinkContract.placeBet({
                 walletClient,
                 userAddress: address,
@@ -152,6 +161,20 @@ export default function MarketsPage() {
               });
               window.dispatchEvent(new CustomEvent("new-bet", { detail: { txHash: hash } }));
               setModal(null);
+            }}
+          />
+        )}
+        {showCreate && (
+          <CreateMarketModal
+            open={showCreate}
+            onClose={() => setShowCreate(false)}
+            onCreated={() => {
+              setShowCreate(false);
+              // trigger reload
+              setTimeout(() => {
+                // naive reload; in real app, fetch again
+                location.reload();
+              }, 300);
             }}
           />
         )}
