@@ -69,7 +69,7 @@ export default function BetsPage() {
                     <div className="text-textSecondary text-sm mb-3">Poll by {poll.handle}</div>
                     
                     <div className="text-textSecondary text-sm mb-2">{poll.percent}% voted</div>
-                    <ProgressBar percent={poll.percent} className="mb-3" />
+                    <ProgressBar percent={poll.percent} />
                     
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-textPrimary font-medium">Yes</span>

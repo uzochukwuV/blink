@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
   // Only handle notifications if Neynar is not enabled
   // When Neynar is enabled, notifications are handled through their webhook
   switch (event.event) {
-    case "frame_added":
-      if (event.notificationDetails) {
+    case "miniapp_added":
+      if ('notificationDetails' in event && event.notificationDetails) {
         await setUserNotificationDetails(fid, event.notificationDetails);
         await sendMiniAppNotification({
           fid,
@@ -69,17 +69,19 @@ export async function POST(request: NextRequest) {
       }
       break;
 
-    case "frame_removed":
+    case "miniapp_removed":
       await deleteUserNotificationDetails(fid);
       break;
 
     case "notifications_enabled":
-      await setUserNotificationDetails(fid, event.notificationDetails);
-      await sendMiniAppNotification({
-        fid,
-        title: `Welcome to ${APP_NAME}`,
-        body: "Notifications are now enabled",
-      });
+      if ('notificationDetails' in event && event.notificationDetails) {
+        await setUserNotificationDetails(fid, event.notificationDetails);
+        await sendMiniAppNotification({
+          fid,
+          title: `Welcome to ${APP_NAME}`,
+          body: "Notifications are now enabled",
+        });
+      }
       break;
 
     case "notifications_disabled":
