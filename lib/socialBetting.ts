@@ -216,36 +216,25 @@ export class SocialBettingService {
    */
   async createBettingGroup(creatorFid: number, groupData: Partial<BettingGroup>): Promise<string | null> {
     try {
-      const group: BettingGroup = {
-        id: `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: groupData.name || 'New Betting Group',
-        description: groupData.description || '',
-        createdBy: creatorFid,
-        members: [{
-          fid: creatorFid,
-          username: 'creator',
-          displayName: 'Group Creator',
-          joinedAt: new Date(),
-          role: 'admin',
-          totalBets: 0,
-          totalWinnings: 0,
-          winRate: 0,
-          reputation: 50,
-          isActive: true
-        }],
-        totalMembers: 1,
-        totalVolume: 0,
-        isPublic: groupData.isPublic || true,
-        inviteCode: Math.random().toString(36).substr(2, 8).toUpperCase(),
-        tags: groupData.tags || [],
-        createdAt: new Date(),
-        rules: groupData.rules,
-        minStake: groupData.minStake
-      };
+      const response = await fetch('/api/betting-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userFid: creatorFid,
+          ...groupData,
+        }),
+      });
 
-      // Save to database (mock implementation)
-      console.log('Created betting group:', group);
-      return group.id;
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data.id;
+      } else {
+        console.error('Failed to create betting group:', result.error);
+        return null;
+      }
     } catch (error) {
       console.error('Error creating betting group:', error);
       return null;
@@ -260,61 +249,56 @@ export class SocialBettingService {
     category?: string,
     limit: number = 50
   ): Promise<LeaderboardEntry[]> {
-    // Mock implementation - in real app would query database
-    const mockLeaderboard: LeaderboardEntry[] = [
-      {
-        rank: 1,
-        fid: 123,
-        username: 'viral_prophet',
-        displayName: 'Viral Prophet',
-        profilePicture: 'https://example.com/avatar1.jpg',
-        score: 2450,
-        totalBets: 156,
-        winRate: 0.73,
-        totalProfit: 1250.50,
-        winStreak: 12,
-        badges: [
-          {
-            id: 'viral_master',
-            name: 'Viral Master',
-            description: 'Predicted 50+ viral posts',
-            icon: '🚀',
-            rarity: 'epic',
-            earnedAt: new Date(),
-            category: 'achievement'
-          }
-        ],
-        trend: 'up'
-      },
-      // More entries would be here...
-    ];
+    try {
+      const params = new URLSearchParams({
+        period,
+        limit: limit.toString(),
+      });
 
-    return mockLeaderboard.slice(0, limit);
+      if (category) {
+        params.append('category', category);
+      }
+
+      const response = await fetch(`/api/leaderboard?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success) {
+        return result.data;
+      } else {
+        console.error('Failed to fetch leaderboard:', result.error);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      return [];
+    }
   }
 
   /**
    * Get social feed of followed bettors' activity
    */
   async getSocialFeed(userFid: number, limit: number = 20): Promise<SocialBet[]> {
-    // Mock implementation
-    const mockFeed: SocialBet[] = [
-      {
-        id: 'social_bet_1',
-        betId: 'bet_123',
-        marketId: 'market_456',
-        bettor: 789,
-        amount: 25.50,
-        outcome: true,
-        timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-        isPublic: true,
-        note: 'Feeling confident about this one! 🚀',
-        followers: [userFid],
-        copiedBy: [101, 102],
-        groupId: 'group_abc'
-      }
-    ];
+    try {
+      const params = new URLSearchParams({
+        userFid: userFid.toString(),
+        limit: limit.toString(),
+      });
 
-    return mockFeed.slice(0, limit);
+      const response = await fetch(`/api/social-feed?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success) {
+        return result.data;
+      } else {
+        console.error('Failed to fetch social feed:', result.error);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching social feed:', error);
+      return [];
+    }
+  }
+
   }
 
   /**
@@ -322,28 +306,22 @@ export class SocialBettingService {
    */
   async createCompetition(competitionData: Partial<Competition>): Promise<string | null> {
     try {
-      const competition: Competition = {
-        id: `comp_${Date.now()}`,
-        name: competitionData.name || 'Weekly Prediction Challenge',
-        description: competitionData.description || '',
-        startDate: competitionData.startDate || new Date(),
-        endDate: competitionData.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        entryFee: competitionData.entryFee,
-        prizePool: competitionData.prizePool || 0,
-        maxParticipants: competitionData.maxParticipants || 100,
-        participants: [],
-        rules: competitionData.rules || 'Standard betting rules apply',
-        category: competitionData.category || 'general',
-        status: 'upcoming',
-        prizes: competitionData.prizes || [
-          { position: 1, amount: 0, title: 'Champion' },
-          { position: 2, amount: 0, title: 'Runner-up' },
-          { position: 3, amount: 0, title: 'Third Place' }
-        ]
-      };
+      const response = await fetch('/api/competitions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(competitionData),
+      });
 
-      console.log('Created competition:', competition);
-      return competition.id;
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data.id;
+      } else {
+        console.error('Failed to create competition:', result.error);
+        return null;
+      }
     } catch (error) {
       console.error('Error creating competition:', error);
       return null;
@@ -352,18 +330,59 @@ export class SocialBettingService {
 
   // Private helper methods
   private async getBetDetails(betId: string): Promise<SocialBet | null> {
-    // Mock implementation
-    return null;
+    try {
+      const response = await fetch(`/api/bets/${betId}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching bet details:', error);
+      return null;
+    }
   }
 
   private async placeBet(betData: any): Promise<string> {
-    // Mock implementation - would integrate with smart contract
-    return `bet_${Date.now()}`;
+    try {
+      const response = await fetch('/api/bets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(betData),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        return result.data.id;
+      } else {
+        throw new Error(result.error || 'Failed to place bet');
+      }
+    } catch (error) {
+      console.error('Error placing bet:', error);
+      throw error;
+    }
   }
 
   private async trackBetCopy(originalBetId: string, copiedBetId: string): Promise<void> {
-    // Track copy relationship in database
-    console.log(`Tracked bet copy: ${originalBetId} -> ${copiedBetId}`);
+    try {
+      await fetch('/api/bet-copies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          originalBetId,
+          copiedBetId,
+        }),
+      });
+    } catch (error) {
+      console.error('Error tracking bet copy:', error);
+    }
   }
 }
 

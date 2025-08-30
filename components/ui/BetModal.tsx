@@ -10,7 +10,7 @@ export function BetModal({
 }: {
   open: boolean;
   onClose: () => void;
-  market?: { id: string; title: string };
+  market?: { marketId: string; marketTitle: string; };
   onSubmit: (payload: { amount: number; side: "yes" | "no"; notes?: string }) => Promise<void>;
 }) {
   const [amount, setAmount] = useState("");
@@ -77,7 +77,7 @@ export function BetModal({
           </button>
         </div>
         <div className="mb-2">
-          <div className="font-medium">{market?.title || "Market"}</div>
+          <div className="font-medium">{market?.marketTitle || "Market"}</div>
         </div>
         <form
           onSubmit={async (e) => {

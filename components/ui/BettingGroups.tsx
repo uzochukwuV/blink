@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { BettingGroup, BettingGroupMember, Competition, socialBettingService } from '~/lib/socialBetting';
+import { BettingGroup } from '~/lib/socialBetting';
+import { useBettingGroups } from '~/hooks/useBettingGroups';
 
 interface BettingGroupsProps {
   userFid: number;
@@ -8,92 +9,28 @@ interface BettingGroupsProps {
 }
 
 export function BettingGroups({ userFid, className = '' }: BettingGroupsProps) {
-  const [userGroups, setUserGroups] = useState<BettingGroup[]>([]);
-  const [discoverGroups, setDiscoverGroups] = useState<BettingGroup[]>([]);
   const [activeTab, setActiveTab] = useState<'my-groups' | 'discover' | 'create'>('my-groups');
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadGroups = async () => {
-      try {
-        // Mock data - in real app would fetch from API
-        const mockUserGroups: BettingGroup[] = [
-          {
-            id: 'group_1',
-            name: 'Viral Content Predictors',
-            description: 'Specialists in predicting viral Farcaster content',
-            createdBy: 123,
-            members: [
-              {
-                fid: userFid,
-                username: 'you',
-                displayName: 'You',
-                joinedAt: new Date(),
-                role: 'member',
-                totalBets: 45,
-                totalWinnings: 230.50,
-                winRate: 0.67,
-                reputation: 78,
-                isActive: true
-              }
-            ],
-            totalMembers: 23,
-            totalVolume: 12450.75,
-            isPublic: true,
-            inviteCode: 'VIRAL2024',
-            tags: ['viral', 'content', 'farcaster'],
-            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            rules: 'Focus on viral content predictions. Minimum $10 bet to participate.',
-            minStake: 10
-          }
-        ];
+  // Fetch user's groups
+  const { 
+    groups: userGroups, 
+    loading: userGroupsLoading, 
+    error: userGroupsError, 
+    refresh: refreshUserGroups 
+  } = useBettingGroups({ userFid, type: 'my-groups' });
 
-        const mockDiscoverGroups: BettingGroup[] = [
-          {
-            id: 'group_2',
-            name: 'Creator Growth Champions',
-            description: 'Track and bet on fastest growing Farcaster creators',
-            createdBy: 456,
-            members: [],
-            totalMembers: 156,
-            totalVolume: 45720.25,
-            isPublic: true,
-            inviteCode: 'GROWTH2024',
-            tags: ['growth', 'creators', 'analytics'],
-            avatar: 'https://example.com/group2.jpg',
-            createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-            rules: 'Advanced strategies for creator growth betting. Experienced bettors only.',
-            minStake: 25
-          },
-          {
-            id: 'group_3',
-            name: 'Beginner Betting Circle',
-            description: 'Learn to bet with friendly community support',
-            createdBy: 789,
-            members: [],
-            totalMembers: 89,
-            totalVolume: 8950.00,
-            isPublic: true,
-            inviteCode: 'LEARN2024',
-            tags: ['beginner', 'learning', 'support'],
-            createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-            rules: 'Supportive environment for new bettors. Max $20 bets recommended.'
-          }
-        ];
+  // Fetch discoverable groups
+  const { 
+    groups: discoverGroups, 
+    loading: discoverGroupsLoading, 
+    error: discoverGroupsError, 
+    joinGroup 
+  } = useBettingGroups({ userFid, type: 'discover' });
 
-        setUserGroups(mockUserGroups);
-        setDiscoverGroups(mockDiscoverGroups);
-      } catch (error) {
-        console.error('Error loading groups:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const currentLoading = activeTab === 'my-groups' ? userGroupsLoading : discoverGroupsLoading;
+  const currentError = activeTab === 'my-groups' ? userGroupsError : discoverGroupsError;
 
-    loadGroups();
-  }, [userFid]);
-
-  if (loading) {
+  if (currentLoading) {
     return (
       <div className={className}>
         <div className="animate-pulse space-y-4">
@@ -138,15 +75,32 @@ export function BettingGroups({ userFid, className = '' }: BettingGroupsProps) {
         ))}
       </div>
 
+      {/* Error State */}
+      {currentError && (
+        <div className="text-center py-8">
+          <div className="text-red-500 text-sm mb-4">{currentError}</div>
+          <button 
+            onClick={() => activeTab === 'my-groups' ? refreshUserGroups() : undefined}
+            className="btn btn-primary"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
       {/* Tab Content */}
-      {activeTab === 'my-groups' && (
+      {!currentError && activeTab === 'my-groups' && (
         <MyGroupsTab groups={userGroups} userFid={userFid} />
       )}
-      {activeTab === 'discover' && (
-        <DiscoverGroupsTab groups={discoverGroups} userFid={userFid} />
+      {!currentError && activeTab === 'discover' && (
+        <DiscoverGroupsTab 
+          groups={discoverGroups} 
+          userFid={userFid} 
+          onJoinGroup={joinGroup}
+        />
       )}
-      {activeTab === 'create' && (
-        <CreateGroupTab userFid={userFid} />
+      {!currentError && activeTab === 'create' && (
+        <CreateGroupTab userFid={userFid} onGroupCreated={refreshUserGroups} />
       )}
     </div>
   );
@@ -161,8 +115,18 @@ function MyGroupsTab({ groups, userFid }: { groups: BettingGroup[]; userFid: num
         <h3 className="text-lg font-semibold text-foreground mb-2">No Groups Yet</h3>
         <p className="text-muted-foreground mb-6">Join or create a betting group to connect with other predictors</p>
         <div className="flex gap-3 justify-center">
-          <button className="btn btn-primary">Discover Groups</button>
-          <button className="btn btn-outline">Create Group</button>
+          <button 
+            onClick={() => window.location.href = '#discover'}
+            className="btn btn-primary"
+          >
+            Discover Groups
+          </button>
+          <button 
+            onClick={() => window.location.href = '#create'}
+            className="btn btn-outline"
+          >
+            Create Group
+          </button>
         </div>
       </div>
     );
@@ -178,9 +142,18 @@ function MyGroupsTab({ groups, userFid }: { groups: BettingGroup[]; userFid: num
 }
 
 // Discover Groups Tab
-function DiscoverGroupsTab({ groups, userFid }: { groups: BettingGroup[]; userFid: number }) {
+function DiscoverGroupsTab({ 
+  groups, 
+  userFid, 
+  onJoinGroup 
+}: { 
+  groups: BettingGroup[]; 
+  userFid: number;
+  onJoinGroup: (groupId: string) => Promise<boolean>;
+}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [joiningGroup, setJoiningGroup] = useState<string | null>(null);
 
   const allTags = Array.from(new Set(groups.flatMap(g => g.tags)));
   
@@ -193,9 +166,20 @@ function DiscoverGroupsTab({ groups, userFid }: { groups: BettingGroup[]; userFi
   });
 
   const handleJoinGroup = async (groupId: string) => {
-    // Mock join group functionality
-    console.log(`Joining group ${groupId} as user ${userFid}`);
-    alert('Group join request sent!');
+    setJoiningGroup(groupId);
+    try {
+      const success = await onJoinGroup(groupId);
+      
+      if (success) {
+        alert('Successfully joined the group!');
+      } else {
+        alert('Failed to join the group. Please try again.');
+      }
+    } catch (error) {
+      alert('Error joining group. Please try again.');
+    } finally {
+      setJoiningGroup(null);
+    }
   };
 
   return (
@@ -251,9 +235,10 @@ function DiscoverGroupsTab({ groups, userFid }: { groups: BettingGroup[]; userFi
               </div>
               <button
                 onClick={() => handleJoinGroup(group.id)}
+                disabled={joiningGroup === group.id}
                 className="btn btn-primary"
               >
-                Join Group
+                {joiningGroup === group.id ? 'Joining...' : 'Join Group'}
               </button>
             </div>
 
@@ -308,7 +293,13 @@ function DiscoverGroupsTab({ groups, userFid }: { groups: BettingGroup[]; userFi
 }
 
 // Create Group Tab
-function CreateGroupTab({ userFid }: { userFid: number }) {
+function CreateGroupTab({ 
+  userFid, 
+  onGroupCreated 
+}: { 
+  userFid: number;
+  onGroupCreated: () => void;
+}) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -319,22 +310,33 @@ function CreateGroupTab({ userFid }: { userFid: number }) {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      const groupId = await socialBettingService.createBettingGroup(userFid, {
-        name: formData.name,
-        description: formData.description,
-        isPublic: formData.isPublic,
-        minStake: formData.minStake ? parseFloat(formData.minStake) : undefined,
-        rules: formData.rules || undefined,
-        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
+      const response = await fetch('/api/betting-groups', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userFid,
+          name: formData.name,
+          description: formData.description,
+          isPublic: formData.isPublic,
+          minStake: formData.minStake || undefined,
+          rules: formData.rules || undefined,
+          tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
+        }),
       });
 
-      if (groupId) {
+      const result = await response.json();
+
+      if (result.success) {
         alert('Group created successfully!');
         // Reset form
         setFormData({
@@ -345,10 +347,13 @@ function CreateGroupTab({ userFid }: { userFid: number }) {
           rules: '',
           tags: ''
         });
+        // Refresh user groups
+        onGroupCreated();
+      } else {
+        setError(result.error || 'Failed to create group');
       }
     } catch (error) {
-      console.error('Error creating group:', error);
-      alert('Failed to create group. Please try again.');
+      setError('Failed to create group. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -358,6 +363,12 @@ function CreateGroupTab({ userFid }: { userFid: number }) {
     <div className="max-w-2xl mx-auto">
       <div className="bg-card rounded-xl p-6 border border-border">
         <h2 className="text-xl font-bold text-foreground mb-6">Create New Betting Group</h2>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -483,6 +494,7 @@ function CreateGroupTab({ userFid }: { userFid: number }) {
                   rules: '',
                   tags: ''
                 });
+                setError(null);
               }}
             >
               Reset

@@ -38,7 +38,7 @@ export default function MarketsPage() {
   const [data, setData] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [modal, setModal] = useState<{ id: string; title: string } | null>(null);
+  const [modal, setModal] = useState<{ marketId: string; marketTitle: string; } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -135,7 +135,7 @@ export default function MarketsPage() {
                   </div>
                   <PillButton
                     className="bg-primary hover:bg-primary-dark text-white px-5"
-                    onClick={() => setModal({ id: String(m.id), title: m.title })}
+                    onClick={() => setModal({marketId: String(m.id), marketTitle: m.title })}
                   >
                     Bet
                   </PillButton>
@@ -151,7 +151,7 @@ export default function MarketsPage() {
             market={modal}
             onSubmit={async ({ amount, side }) => {
               if (!address) throw new Error("Connect a wallet or Base Account");
-              const marketId = parseInt(modal.id, 10);
+              const marketId = parseInt(modal.marketId  , 10);
               const hash = await blinkContract.placeBet({
                 walletClient,
                 userAddress: address,
