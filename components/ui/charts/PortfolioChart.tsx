@@ -61,16 +61,17 @@ export function PortfolioChart({ data, className = "" }: PortfolioChartProps) {
         borderColor: '#374151',
         borderWidth: 1,
         callbacks: {
-          label: function(context: any) {
-            let label = context.dataset.label || '';
+          label: function(context: unknown) {
+            const ctx = context as { dataset: { label?: string }, parsed: { y: number | null } };
+            let label = ctx.dataset.label || '';
             if (label) {
               label += ': ';
             }
-            if (context.parsed.y !== null) {
+            if (ctx.parsed.y !== null) {
               label += new Intl.NumberFormat('en-US', {
                 style: 'currency',
                 currency: 'USD'
-              }).format(context.parsed.y);
+              }).format(ctx.parsed.y);
             }
             return label;
           }
@@ -100,13 +101,13 @@ export function PortfolioChart({ data, className = "" }: PortfolioChartProps) {
           font: {
             size: 11
           },
-          callback: function(value: any) {
+          callback: function(value: unknown) {
             return new Intl.NumberFormat('en-US', {
               style: 'currency',
               currency: 'USD',
               minimumFractionDigits: 0,
               maximumFractionDigits: 0
-            }).format(value);
+            }).format(value as number);
           }
         }
       }

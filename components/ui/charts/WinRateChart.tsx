@@ -55,8 +55,9 @@ export function WinRateChart({ winRate, className = "" }: WinRateChartProps) {
         borderColor: '#374151',
         borderWidth: 1,
         callbacks: {
-          label: function(context: any) {
-            return `${context.label}: ${context.parsed.toFixed(1)}%`;
+          label: function(context: unknown) {
+            const ctx = context as { label: string, parsed: number };
+            return `${ctx.label}: ${ctx.parsed.toFixed(1)}%`;
           }
         }
       }

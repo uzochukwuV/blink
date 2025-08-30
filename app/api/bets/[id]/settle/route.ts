@@ -17,8 +17,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid result" }, { status: 400 });
   }
 
-  let openBets: Bet[] = (await kv.get(getKey("open"))) || [];
-  let completedBets: Bet[] = (await kv.get(getKey("completed"))) || [];
+  const openBets: Bet[] = (await kv.get(getKey("open"))) || [];
+  const completedBets: Bet[] = (await kv.get(getKey("completed"))) || [];
 
   const idx = openBets.findIndex((b) => b.id === params.id);
   if (idx === -1) {
