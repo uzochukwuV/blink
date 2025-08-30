@@ -22,13 +22,13 @@ export const APP_URL: string = process.env.NEXT_PUBLIC_URL!;
  * The name of the mini app as displayed to users.
  * Used in titles, headers, and app store listings.
  */
-export const APP_NAME: string = 'Starter Kit';
+export const APP_NAME: string = 'Blink';
 
 /**
  * A brief description of the mini app's functionality.
  * Used in app store listings and metadata.
  */
-export const APP_DESCRIPTION: string = 'A demo of the Neynar Starter Kit';
+export const APP_DESCRIPTION: string = 'Social prediction markets on Farcaster';
 
 /**
  * The primary category for the mini app.

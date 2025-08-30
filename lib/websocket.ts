@@ -7,7 +7,7 @@ import { RealTimeMetrics } from './marketTypes';
 import { ChatMessage, SocialBet } from './socialBetting';
 
 export interface WebSocketMessage {
-  type: 'market_update' | 'chat_message' | 'bet_placed' | 'odds_change' | 'user_joined' | 'user_left';
+  type: 'market_update' | 'chat_message' | 'bet_placed' | 'odds_change' | 'user_joined' | 'user_left' | 'subscribe' | 'unsubscribe' | 'ping';
   data: any;
   timestamp: Date;
   marketId?: string;

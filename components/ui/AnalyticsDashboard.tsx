@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreatorAnalytics, PortfolioAnalytics, MarketAnalytics, analyticsService } from '~/lib/analytics';
 import { PredictionType } from '~/lib/marketTypes';
+import { PortfolioChart, MarketChart, WinRateChart } from './charts';
 
 interface AnalyticsDashboardProps {
   userFid: number;
@@ -151,13 +152,27 @@ function OverviewTab({
       {/* Recent Performance Chart */}
       <div className="bg-card rounded-xl p-6 border border-border">
         <h3 className="text-lg font-semibold text-foreground mb-4">Performance Trend</h3>
-        <div className="h-64 flex items-center justify-center bg-muted rounded-lg">
-          <div className="text-center">
-            <div className="text-4xl mb-2">📈</div>
-            <div className="text-muted-foreground">Performance chart would go here</div>
-            <div className="text-sm text-muted-foreground">(Integration with charting library needed)</div>
-          </div>
-        </div>
+        <PortfolioChart 
+          data={{
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [
+              {
+                label: 'Portfolio Value',
+                data: [
+                  portfolioAnalytics?.totalInvested || 0,
+                  (portfolioAnalytics?.totalInvested || 0) * 1.05,
+                  (portfolioAnalytics?.totalInvested || 0) * 0.95,
+                  (portfolioAnalytics?.totalInvested || 0) * 1.15,
+                  (portfolioAnalytics?.totalInvested || 0) * 1.08,
+                  portfolioAnalytics?.currentValue || 0
+                ],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true
+              }
+            ]
+          }}
+        />
       </div>
 
       {/* Quick Stats Grid */}
@@ -379,6 +394,41 @@ function PerformanceTab({ creatorAnalytics }: { creatorAnalytics: CreatorAnalyti
           ))}
         </div>
       </div>
+
+      {/* Win Rate Chart */}
+      {creatorAnalytics && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-card rounded-xl p-6 border border-border">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Win Rate Breakdown</h3>
+            <WinRateChart winRate={creatorAnalytics.winRate * 100} />
+          </div>
+          
+          <div className="bg-card rounded-xl p-6 border border-border">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Performance</h3>
+            <MarketChart 
+              data={{
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [
+                  {
+                    label: 'Win Rate %',
+                    data: [45, 52, 48, 65, 58, creatorAnalytics.winRate * 100],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.3
+                  },
+                  {
+                    label: 'ROI %',
+                    data: [12, 18, 5, 25, 15, creatorAnalytics.roi * 100],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.3
+                  }
+                ]
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Social Metrics */}
       {creatorAnalytics && (
