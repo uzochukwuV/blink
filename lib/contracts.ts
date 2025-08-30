@@ -1,5 +1,5 @@
 import { createPublicClient, http, encodeFunctionData, parseUnits, formatUnits } from 'viem';
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import { sendBaseAccountTransaction, isBaseAccountAvailable } from './baseAccount';
 
 // Minimal ERC20 ABI for allowance/approve
@@ -10,190 +10,1431 @@ const ERC20_ABI = [
 
 // Blink contract ABI (aligned with contracts/Blink.sol)
 export const BLINK_ABI = [
-  // mappings
   {
-    type: 'function',
-    name: 'markets',
-    stateMutability: 'view',
-    inputs: [{ name: '_marketId', type: 'uint256' }],
-    outputs: [
-      { name: 'id', type: 'uint32' },
-      { name: 'predictionType', type: 'uint8' },
-      { name: 'title', type: 'string' },
-      { name: 'targetId', type: 'string' },
-      { name: 'threshold', type: 'uint32' },
-      { name: 'deadline', type: 'uint32' },
-      { name: 'yesPool', type: 'uint128' },
-      { name: 'noPool', type: 'uint128' },
-      { name: 'status', type: 'uint8' },
-      { name: 'outcome', type: 'bool' },
-      { name: 'creator', type: 'address' },
-      { name: 'creatorStake', type: 'uint128' },
-      { name: 'totalVolume', type: 'uint128' },
-      { name: 'creatorRewarded', type: 'bool' },
-    ],
-  },
-  // reads
-  {
-    type: 'function',
-    name: 'getActiveMarkets',
-    stateMutability: 'view',
-    inputs: [
-      { name: '_type', type: 'uint8' },
-      { name: '_limit', type: 'uint32' },
-    ],
-    outputs: [{
-      type: 'tuple[]',
-      name: 'markets',
-      components: [
-        { name: 'id', type: 'uint32' },
-        { name: 'predictionType', type: 'uint8' },
-        { name: 'title', type: 'string' },
-        { name: 'targetId', type: 'string' },
-        { name: 'threshold', type: 'uint32' },
-        { name: 'deadline', type: 'uint32' },
-        { name: 'yesPool', type: 'uint128' },
-        { name: 'noPool', type: 'uint128' },
-        { name: 'status', type: 'uint8' },
-        { name: 'outcome', type: 'bool' },
-        { name: 'creator', type: 'address' },
-        { name: 'creatorStake', type: 'uint128' },
-        { name: 'totalVolume', type: 'uint128' },
-        { name: 'creatorRewarded', type: 'bool' },
-      ],
-    }],
-  },
-  {
-    type: 'function',
-    name: 'getUserBets',
-    stateMutability: 'view',
-    inputs: [
-      { name: '_user', type: 'address' },
-      { name: '_limit', type: 'uint32' },
-    ],
-    outputs: [{
-      type: 'tuple[]',
-      components: [
-        { name: 'id', type: 'uint32' },
-        { name: 'marketId', type: 'uint32' },
-        { name: 'bettor', type: 'address' },
-        { name: 'outcome', type: 'bool' },
-        { name: 'amount', type: 'uint128' },
-        { name: 'timestamp', type: 'uint32' },
-        { name: 'settled', type: 'bool' },
-        { name: 'payout', type: 'uint128' },
-      ],
-    }],
-  },
-  {
-    type: 'function',
-    name: 'getMarketWithOdds',
-    stateMutability: 'view',
-    inputs: [{ name: '_marketId', type: 'uint32' }],
-    outputs: [
+    "inputs": [
       {
-        type: 'tuple',
-        name: 'market',
-        components: [
-          { name: 'id', type: 'uint32' },
-          { name: 'predictionType', type: 'uint8' },
-          { name: 'title', type: 'string' },
-          { name: 'targetId', type: 'string' },
-          { name: 'threshold', type: 'uint32' },
-          { name: 'deadline', type: 'uint32' },
-          { name: 'yesPool', type: 'uint128' },
-          { name: 'noPool', type: 'uint128' },
-          { name: 'status', type: 'uint8' },
-          { name: 'outcome', type: 'bool' },
-          { name: 'creator', type: 'address' },
-          { name: 'creatorStake', type: 'uint128' },
-          { name: 'totalVolume', type: 'uint128' },
-          { name: 'creatorRewarded', type: 'bool' },
-        ],
+        "internalType": "address",
+        "name": "_usdc",
+        "type": "address"
       },
-      { name: 'yesOdds', type: 'uint256' },
-      { name: 'noOdds', type: 'uint256' },
-      { name: 'creatorStakeUSD', type: 'uint256' },
+      {
+        "internalType": "address",
+        "name": "_usdcPriceFeed",
+        "type": "address"
+      }
     ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
   },
   {
-    type: 'function',
-    name: 'getBetLimits',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [
-      { name: 'minBet', type: 'uint128' },
-      { name: 'maxBet', type: 'uint128' },
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
     ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
   },
   {
-    type: 'function',
-    name: 'getCreatorStakeLimits',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [
-      { name: 'minStake', type: 'uint128' },
-      { name: 'maxStake', type: 'uint128' },
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
     ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
   },
-  // writes
   {
-    type: 'function',
-    name: 'createMarket',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: '_type', type: 'uint8' },
-      { name: '_title', type: 'string' },
-      { name: '_targetId', type: 'string' },
-      { name: '_threshold', type: 'uint32' },
-      { name: '_duration', type: 'uint32' },
-      { name: '_creatorStake', type: 'uint128' },
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      }
     ],
-    outputs: [{ type: 'uint32' }],
+    "name": "SafeERC20FailedOperation",
+    "type": "error"
   },
   {
-    type: 'function',
-    name: 'placeBet',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: '_marketId', type: 'uint32' },
-      { name: '_outcome', type: 'bool' },
-      { name: '_amount', type: 'uint128' },
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "betId",
+        "type": "uint32"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "bettor",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "outcome",
+        "type": "bool"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint128",
+        "name": "amount",
+        "type": "uint128"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "usdValue",
+        "type": "uint256"
+      }
     ],
-    outputs: [{ type: 'uint32' }],
+    "name": "BetPlaced",
+    "type": "event"
   },
   {
-    type: 'function',
-    name: 'claimWinnings',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: '_betId', type: 'uint32' }],
-    outputs: [],
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint128",
+        "name": "reward",
+        "type": "uint128"
+      }
+    ],
+    "name": "CreatorRewardClaimed",
+    "type": "event"
   },
   {
-    type: 'function',
-    name: 'withdrawCreatorStake',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: '_marketId', type: 'uint32' }],
-    outputs: [],
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint128",
+        "name": "amount",
+        "type": "uint128"
+      }
+    ],
+    "name": "CreatorStakeWithdrawn",
+    "type": "event"
   },
   {
-    type: 'function',
-    name: 'claimCreatorReward',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: '_marketId', type: 'uint32' }],
-    outputs: [],
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum Blink.PredictionType",
+        "name": "predictionType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "title",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "threshold",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint32",
+        "name": "deadline",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint128",
+        "name": "creatorStake",
+        "type": "uint128"
+      }
+    ],
+    "name": "MarketCreated",
+    "type": "event"
   },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "outcome",
+        "type": "bool"
+      }
+    ],
+    "name": "MarketSettled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "newPrice",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "PriceFeedUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint32",
+        "name": "betId",
+        "type": "uint32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "winner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint128",
+        "name": "payout",
+        "type": "uint128"
+      }
+    ],
+    "name": "WinningsClaimed",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "CREATOR_REWARD_PERCENTAGE",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DEFAULT_BET_USD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "HOUSE_EDGE",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_BET_USD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_CREATOR_STAKE_USD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MIN_BET_USD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MIN_CREATOR_STAKE_USD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PRICE_STALENESS_THRESHOLD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "USDC",
+    "outputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "activeMarkets",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_oracle",
+        "type": "address"
+      }
+    ],
+    "name": "addOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "betCounter",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "name": "bets",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "id",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "marketId",
+        "type": "uint32"
+      },
+      {
+        "internalType": "address",
+        "name": "bettor",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "outcome",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint128",
+        "name": "amount",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint32",
+        "name": "timestamp",
+        "type": "uint32"
+      },
+      {
+        "internalType": "bool",
+        "name": "settled",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint128",
+        "name": "payout",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "_marketId",
+        "type": "uint32"
+      }
+    ],
+    "name": "cancelMarket",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "_marketId",
+        "type": "uint32"
+      }
+    ],
+    "name": "claimCreatorReward",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "_betId",
+        "type": "uint32"
+      }
+    ],
+    "name": "claimWinnings",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint128",
+        "name": "_usdcAmount",
+        "type": "uint128"
+      }
+    ],
+    "name": "convertUSDCToUSD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "usdValue",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum Blink.PredictionType",
+        "name": "_type",
+        "type": "uint8"
+      },
+      {
+        "internalType": "string",
+        "name": "_title",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_targetId",
+        "type": "string"
+      },
+      {
+        "internalType": "uint32",
+        "name": "_threshold",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "_duration",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint128",
+        "name": "_creatorStake",
+        "type": "uint128"
+      }
+    ],
+    "name": "createMarket",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "creatorRewards",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "creatorStakes",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum Blink.PredictionType",
+        "name": "_type",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint32",
+        "name": "_limit",
+        "type": "uint32"
+      }
+    ],
+    "name": "getActiveMarkets",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint32",
+            "name": "id",
+            "type": "uint32"
+          },
+          {
+            "internalType": "enum Blink.PredictionType",
+            "name": "predictionType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "targetId",
+            "type": "string"
+          },
+          {
+            "internalType": "uint32",
+            "name": "threshold",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "deadline",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint128",
+            "name": "yesPool",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "noPool",
+            "type": "uint128"
+          },
+          {
+            "internalType": "enum Blink.MarketStatus",
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "outcome",
+            "type": "bool"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint128",
+            "name": "creatorStake",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "totalVolume",
+            "type": "uint128"
+          },
+          {
+            "internalType": "bool",
+            "name": "creatorRewarded",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct Blink.Market[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getBetLimits",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "minBet",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint128",
+        "name": "maxBet",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_creator",
+        "type": "address"
+      }
+    ],
+    "name": "getCreatorInfo",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "totalStaked",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint128",
+        "name": "pendingRewards",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getCreatorStakeLimits",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "minStake",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint128",
+        "name": "maxStake",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getDefaultBetAmount",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "defaultBet",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "_marketId",
+        "type": "uint32"
+      }
+    ],
+    "name": "getMarketWithOdds",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint32",
+            "name": "id",
+            "type": "uint32"
+          },
+          {
+            "internalType": "enum Blink.PredictionType",
+            "name": "predictionType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string",
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "targetId",
+            "type": "string"
+          },
+          {
+            "internalType": "uint32",
+            "name": "threshold",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "deadline",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint128",
+            "name": "yesPool",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "noPool",
+            "type": "uint128"
+          },
+          {
+            "internalType": "enum Blink.MarketStatus",
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "outcome",
+            "type": "bool"
+          },
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "uint128",
+            "name": "creatorStake",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "totalVolume",
+            "type": "uint128"
+          },
+          {
+            "internalType": "bool",
+            "name": "creatorRewarded",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct Blink.Market",
+        "name": "market",
+        "type": "tuple"
+      },
+      {
+        "internalType": "uint256",
+        "name": "yesOdds",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "noOdds",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "creatorStakeUSD",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getUSDCPrice",
+    "outputs": [
+      {
+        "internalType": "int256",
+        "name": "price",
+        "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint32",
+        "name": "_limit",
+        "type": "uint32"
+      }
+    ],
+    "name": "getUserBets",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint32",
+            "name": "id",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "marketId",
+            "type": "uint32"
+          },
+          {
+            "internalType": "address",
+            "name": "bettor",
+            "type": "address"
+          },
+          {
+            "internalType": "bool",
+            "name": "outcome",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint128",
+            "name": "amount",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint32",
+            "name": "timestamp",
+            "type": "uint32"
+          },
+          {
+            "internalType": "bool",
+            "name": "settled",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint128",
+            "name": "payout",
+            "type": "uint128"
+          }
+        ],
+        "internalType": "struct Blink.Bet[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "getUserStats",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint32",
+            "name": "totalBets",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "wins",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "losses",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint128",
+            "name": "totalVolume",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "totalWinnings",
+            "type": "uint128"
+          }
+        ],
+        "internalType": "struct Blink.UserStats",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "houseTreasury",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "marketCounter",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "name": "markets",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "id",
+        "type": "uint32"
+      },
+      {
+        "internalType": "enum Blink.PredictionType",
+        "name": "predictionType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "string",
+        "name": "title",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "targetId",
+        "type": "string"
+      },
+      {
+        "internalType": "uint32",
+        "name": "threshold",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "deadline",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint128",
+        "name": "yesPool",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint128",
+        "name": "noPool",
+        "type": "uint128"
+      },
+      {
+        "internalType": "enum Blink.MarketStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bool",
+        "name": "outcome",
+        "type": "bool"
+      },
+      {
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "internalType": "uint128",
+        "name": "creatorStake",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint128",
+        "name": "totalVolume",
+        "type": "uint128"
+      },
+      {
+        "internalType": "bool",
+        "name": "creatorRewarded",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum Blink.PredictionType",
+        "name": "",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "marketsByType",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "oracles",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "_marketId",
+        "type": "uint32"
+      },
+      {
+        "internalType": "bool",
+        "name": "_outcome",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint128",
+        "name": "_amount",
+        "type": "uint128"
+      }
+    ],
+    "name": "placeBet",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_oracle",
+        "type": "address"
+      }
+    ],
+    "name": "removeOracle",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "_marketId",
+        "type": "uint32"
+      },
+      {
+        "internalType": "bool",
+        "name": "_outcome",
+        "type": "bool"
+      }
+    ],
+    "name": "settleMarket",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalVolume",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "usdcPriceFeed",
+    "outputs": [
+      {
+        "internalType": "contract AggregatorV3Interface",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "userBets",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "userMarkets",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "userStats",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "totalBets",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "wins",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "losses",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint128",
+        "name": "totalVolume",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint128",
+        "name": "totalWinnings",
+        "type": "uint128"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint32",
+        "name": "_marketId",
+        "type": "uint32"
+      }
+    ],
+    "name": "withdrawCreatorStake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawHouseFees",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
 ] as const;
 
 // Contract address (env configurable)
-export const BLINK_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_BLINK_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000') as `0x${string}`;
+export const BLINK_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_BLINK_CONTRACT_ADDRESS || '0x606F69716C6e4d77759fB85af7d13BC35b210a7f') as `0x${string}`;
 
 // USDC contract address on Base mainnet
-export const USDC_CONTRACT_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const;
+export const USDC_CONTRACT_ADDRESS = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 
 // Initialize client
 export const publicClient = createPublicClient({
-  chain: base,
+  chain: baseSepolia,
   transport: http(),
 });
 
