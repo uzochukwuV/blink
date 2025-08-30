@@ -10,8 +10,9 @@ function getKey(status: "open" | "completed") {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
   const { result, payout } = await req.json();
   if (!["won", "lost"].includes(result)) {
     return NextResponse.json({ error: "Invalid result" }, { status: 400 });
@@ -20,7 +21,7 @@ export async function PATCH(
   const openBets: Bet[] = (await kv.get(getKey("open"))) || [];
   const completedBets: Bet[] = (await kv.get(getKey("completed"))) || [];
 
-  const idx = openBets.findIndex((b) => b.id === params.id);
+  const idx = openBets.findIndex((b) => b.id === resolvedParams.id);
   if (idx === -1) {
     return NextResponse.json({ error: "Bet not found" }, { status: 404 });
   }
